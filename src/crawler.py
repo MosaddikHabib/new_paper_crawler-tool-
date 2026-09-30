@@ -21,6 +21,7 @@ from src.models import (
     ListingItem,
     NavLink,
     normalize_target_url,
+    resolve_url,
 )
 
 try:
@@ -59,8 +60,6 @@ BOILERPLATE_TEXT_PATTERN = re.compile(
     r"page\s*\d+|\d+|«|»|←|→)$",
     re.IGNORECASE,
 )
-
-IGNORED_SCHEMES = ("javascript:", "mailto:", "tel:", "data:", "whatsapp:", "viber:")
 
 
 def fetch_html(url: str, timeout: int = 20) -> str:
@@ -102,18 +101,8 @@ def fetch_html(url: str, timeout: int = 20) -> str:
 
 
 def _clean_url(href: str, base_url: str) -> str | None:
-    """Resolve relative href against base_url and discard non-HTTP/anchor-only links."""
-    raw = (href or "").strip()
-    if not raw or raw.startswith("#"):
-        return None
-    if raw.lower().startswith(IGNORED_SCHEMES):
-        return None
-    resolved = urljoin(base_url, raw)
-    defragged, _ = urldefrag(resolved)
-    parsed = urlparse(defragged)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        return None
-    return defragged
+    """Resolve relative href against base_url via urllib.parse.urljoin without prepending host to absolute URLs."""
+    return resolve_url(base_url, href)
 
 
 def _extract_anchor_label(anchor: Tag) -> str:

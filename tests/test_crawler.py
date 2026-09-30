@@ -19,6 +19,7 @@ from src.models import (
     ListingItem,
     NavLink,
     normalize_target_url,
+    resolve_url,
 )
 from src.search import search_listings
 
@@ -260,3 +261,52 @@ class TestCLIAndWebAPI:
         assert res_missing.status_code == 404
         err_data = res_missing.get_json()
         assert len(err_data["available_categories"]) == 4
+
+    def test_url_resolution_and_concatenated_sanitization(self, monkeypatch):
+        # Concatenated default host + explicit URL is sanitized to explicit URL
+        assert (
+            normalize_target_url("https://news.ycombinator.comhttps://www.prothomalo.com/")
+            == "https://www.prothomalo.com/"
+        )
+        # Markdown link syntax is unwrapped cleanly
+        assert (
+            normalize_target_url("[https://www.prothomalo.com/](https://www.prothomalo.com/)")
+            == "https://www.prothomalo.com/"
+        )
+        # resolve_url uses urljoin for relative links and never prepends base_url to absolute URLs
+        assert (
+            resolve_url("https://news.ycombinator.com", "/bangladesh")
+            == "https://news.ycombinator.com/bangladesh"
+        )
+        assert (
+            resolve_url("https://news.ycombinator.com", "https://www.prothomalo.com/politics")
+            == "https://www.prothomalo.com/politics"
+        )
+        assert (
+            resolve_url(
+                "https://news.ycombinator.com",
+                "https://news.ycombinator.comhttps://www.prothomalo.com/",
+            )
+            == "https://www.prothomalo.com/"
+        )
+
+        # Verify POST /api/categories sanitizes target_url and does not prepend news.ycombinator.com
+        fetched_urls: list[str] = []
+
+        def spy_fetcher(url: str) -> str:
+            fetched_urls.append(url)
+            return SAMPLE_ROOT_HTML
+
+        monkeypatch.setattr(web_app, "fetch_html", spy_fetcher)
+        client = web_app.app.test_client()
+
+        res_cat = client.post(
+            "/api/categories",
+            json={"target_url": "https://news.ycombinator.comhttps://www.prothomalo.com/"},
+        )
+        assert res_cat.status_code == 200
+        cat_data = res_cat.get_json()
+        assert cat_data["target_url"] == "https://www.prothomalo.com/"
+        assert fetched_urls == ["https://www.prothomalo.com/"]
+        assert cat_data["categories"][1]["url"] == "https://www.prothomalo.com/category/technology"
+

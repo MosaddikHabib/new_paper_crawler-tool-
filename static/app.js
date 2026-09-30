@@ -141,12 +141,40 @@
     });
   }
 
+  function sanitizeTargetUrl(rawInput) {
+    let cleaned = (rawInput || "").trim();
+    if (!cleaned) return "";
+
+    // Strip markdown link syntax [label](https://...) if pasted
+    const mdMatch = cleaned.match(/^\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/i);
+    if (mdMatch) {
+      cleaned = mdMatch[1].trim();
+    }
+
+    // If multiple http(s):// schemes exist before any query string '?',
+    // extract the trailing explicit absolute URL (e.g. when pasted after a previous URL)
+    const preQuery = cleaned.split("?")[0];
+    const schemeMatches = [...preQuery.matchAll(/https?:\/\//gi)];
+    if (schemeMatches.length > 1) {
+      const lastIndex = schemeMatches[schemeMatches.length - 1].index;
+      cleaned = cleaned.slice(lastIndex).trim();
+    }
+
+    // Do not prepend any default host if it already starts with http:// or https://
+    if (!/^https?:\/\//i.test(cleaned)) {
+      cleaned = `https://${cleaned.replace(/^\/+/, "")}`;
+    }
+
+    return cleaned;
+  }
+
   async function discoverCategories() {
-    const targetUrl = targetUrlInput.value.trim();
+    const targetUrl = sanitizeTargetUrl(targetUrlInput.value);
     if (!targetUrl) {
       showError("Please enter a Target Root URL first.");
       return;
     }
+    targetUrlInput.value = targetUrl;
     showError("");
     setStatus("Discovering Nav...", "loading");
     discoverNavBtn.disabled = true;
@@ -175,12 +203,14 @@
 
   async function runCrawl(e) {
     if (e) e.preventDefault();
-    const targetUrl = targetUrlInput.value.trim();
-    const navCategory = navCategoryInput.value.trim();
-    if (!targetUrl || !navCategory) {
-      showError("Both target_url and nav_category are required.");
+    const targetUrl = sanitizeTargetUrl(targetUrlInput.value);
+    const navCategory = navCategoryInput.value.trim() || "all";
+    if (!targetUrl) {
+      showError("target_url is required.");
       return;
     }
+    targetUrlInput.value = targetUrl;
+    navCategoryInput.value = navCategory;
 
     showError("");
     setStatus("Crawling...", "loading");

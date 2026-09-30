@@ -1,0 +1,11 @@
+schema: spec-driven
+created: 2026-09-30
+title: Fix URL resolution and payload sanitization
+problem: |
+  POST /api/categories attempts to request malformed URLs like:
+  https://news.ycombinator.comhttps://www.prothomalo.com/
+  due to raw string concatenation and unsanitized front-end target inputs.
+requirements:
+  - Replace raw string concatenation with urllib.parse.urljoin.
+  - If a link or target URL already starts with http:// or https://, do not prepend any default host.
+  - In static/app.js, prevent prepending fallback base URLs to explicit user inputs before POSTing to /api/categories.

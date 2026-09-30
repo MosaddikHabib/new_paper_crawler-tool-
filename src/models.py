@@ -1,28 +1,94 @@
-"""Data schemas for universal-crawler (generic-web-scraper).
+"""Data schemas and URL resolution utilities for universal-crawler (generic-web-scraper).
 
-Follows OpenSpec specification in openspec/changes/universal-crawler/:
+Follows OpenSpec specifications:
 - inputs: target_url (string), nav_category (string)
 - outputs: items: Array<{ title: string, url: string }>
+- URL resolution: urllib.parse.urljoin without prepending default hosts to absolute URLs
 """
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
+import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urldefrag, urljoin, urlparse
+
+IGNORED_SCHEMES = ("javascript:", "mailto:", "tel:", "data:", "whatsapp:", "viber:")
+_MARKDOWN_LINK_RE = re.compile(r"^\[[^\]]*\]\((https?://[^)\s]+)\)$", re.IGNORECASE)
+_SCHEME_FINDER_RE = re.compile(r"https?://", re.IGNORECASE)
+
+
+def sanitize_raw_url(raw_url: str) -> str:
+    """Sanitize user-supplied or scraped URL strings.
+
+    - Strips surrounding whitespace and markdown link wrappers `[label](https://...)`.
+    - Fixes accidentally concatenated URLs such as
+      `https://news.ycombinator.comhttps://www.prothomalo.com/` by extracting
+      the trailing explicit `http://` or `https://` URL when multiple schemes
+      appear before any query string (`?`).
+    """
+    cleaned = (raw_url or "").strip()
+    if not cleaned:
+        return ""
+
+    md_match = _MARKDOWN_LINK_RE.match(cleaned)
+    if md_match:
+        cleaned = md_match.group(1).strip()
+
+    # Check if multiple http(s):// occurrences exist prior to any query string '?'
+    pre_query = cleaned.split("?", 1)[0]
+    matches = list(_SCHEME_FINDER_RE.finditer(pre_query))
+    if len(matches) > 1:
+        last_start = matches[-1].start()
+        cleaned = cleaned[last_start:].strip()
+
+    return cleaned
 
 
 def normalize_target_url(url: str) -> str:
-    """Validate and normalize a root target URL."""
-    cleaned = (url or "").strip()
+    """Validate and normalize a root target URL without prepending a host to absolute URLs."""
+    cleaned = sanitize_raw_url(url)
     if not cleaned:
         raise ValueError("target_url must be a non-empty string.")
-    if not cleaned.startswith(("http://", "https://")):
-        cleaned = f"https://{cleaned}"
+
+    # Only add https:// if no scheme is present at all
+    if not cleaned.lower().startswith(("http://", "https://")):
+        if "://" in cleaned:
+            raise ValueError(f"Unsupported URL scheme in target_url: {url!r}")
+        cleaned = f"https://{cleaned.lstrip('/')}"
+
     parsed = urlparse(cleaned)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or not parsed.hostname:
         raise ValueError(f"Invalid target_url: {url!r}")
+    if ":" in parsed.hostname:
+        raise ValueError(f"Malformed hostname in target_url: {url!r}")
+
     return cleaned
+
+
+def resolve_url(base_url: str, link: str) -> str | None:
+    """Resolve a link against base_url using urllib.parse.urljoin.
+
+    - If `link` already starts with `http://` or `https://`, do not prepend `base_url`.
+    - Otherwise, resolve relative paths against `base_url` via `urllib.parse.urljoin`.
+    """
+    raw = sanitize_raw_url(link)
+    if not raw or raw.startswith("#"):
+        return None
+    if raw.lower().startswith(IGNORED_SCHEMES):
+        return None
+
+    if raw.lower().startswith(("http://", "https://")):
+        resolved = raw
+    else:
+        normalized_base = normalize_target_url(base_url)
+        resolved = urljoin(normalized_base, raw)
+
+    defragged, _ = urldefrag(resolved)
+    parsed = urlparse(defragged)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or not parsed.hostname:
+        return None
+    return defragged
 
 
 @dataclass(frozen=True)
