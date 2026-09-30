@@ -1,0 +1,18 @@
+schema: spec-driven
+created: 2026-09-30
+name: generic-web-scraper
+description: Configurable crawler to extract nav links and page listings from any target site.
+inputs:
+  target_url: string
+  nav_category: string
+outputs:
+  items:
+    type: array
+    items:
+      title: string
+      url: string
+behavior:
+  - Crawl starting from target_url
+  - Identify and select the target nav category
+  - Extract all listing titles and URLs from the target category page
+  - Support generic CLI / UI search across extracted records

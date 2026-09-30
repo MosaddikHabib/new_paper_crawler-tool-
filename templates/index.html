@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Universal Crawler — Generic Nav & Listing Extractor</title>
+  <meta name="description" content="Configurable OpenSpec web scraper to discover navigation categories, extract page listings (title, url), and search across extracted records." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-badge">OpenSpec + gstack</span>
+        <h1 id="app-title">Universal Crawler</h1>
+        <p class="subtitle">Configurable Navigation Discovery &amp; Listing Extractor (<code>{ title, url }</code>)</p>
+      </div>
+      <div class="preset-group" aria-label="Quick Target Presets">
+        <span class="preset-label">Quick Presets:</span>
+        <button type="button" id="preset-hn-btn" class="chip-btn" data-url="https://news.ycombinator.com" data-category="show">Hacker News (show)</button>
+        <button type="button" id="preset-books-btn" class="chip-btn" data-url="https://books.toscrape.com" data-category="Mystery">Books to Scrape (Mystery)</button>
+        <button type="button" id="preset-bdp-btn" class="chip-btn" data-url="https://www.bd-pratidin.com" data-category="জাতীয়">BD Pratidin (জাতীয়)</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-layout">
+    <section class="glass-card control-panel" aria-labelledby="crawl-config-heading">
+      <div class="panel-header">
+        <h2 id="crawl-config-heading">1. Configure Target &amp; Navigation Category</h2>
+        <span id="status-pill" class="status-pill status-idle">Ready</span>
+      </div>
+
+      <form id="crawl-form" class="crawl-form" novalidate>
+        <div class="field-group">
+          <label for="target-url-input">Target Root URL (<code>target_url</code>)</label>
+          <div class="input-with-action">
+            <input
+              type="url"
+              id="target-url-input"
+              name="target_url"
+              placeholder="https://news.ycombinator.com"
+              value="https://news.ycombinator.com"
+              required
+              autocomplete="url"
+            />
+            <button type="button" id="discover-nav-btn" class="btn btn-secondary" title="Fetch available navigation categories from Target URL">
+              Discover Nav
+            </button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="nav-category-input">Navigation Category (<code>nav_category</code>)</label>
+          <input
+            type="text"
+            id="nav-category-input"
+            name="nav_category"
+            placeholder="e.g. show, new, Tech, Sports, or all"
+            value="show"
+            required
+          />
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="crawl-submit-btn" class="btn btn-primary">
+            Crawl &amp; Extract Listings
+          </button>
+        </div>
+      </form>
+
+      <div id="nav-categories-drawer" class="nav-drawer hidden" aria-live="polite">
+        <div class="drawer-header">
+          <span id="nav-drawer-title" class="drawer-title">Discovered Navigation Categories</span>
+          <span class="drawer-hint">Click any category pill to select &amp; crawl</span>
+        </div>
+        <div id="nav-categories-list" class="pill-cloud"></div>
+      </div>
+
+      <div id="error-banner" class="error-banner hidden" role="alert"></div>
+    </section>
+
+    <section class="glass-card results-panel" aria-labelledby="results-heading">
+      <div class="results-toolbar">
+        <div class="results-title-wrap">
+          <h2 id="results-heading">2. Extracted Records &amp; Live Search</h2>
+          <p id="crawl-meta" class="crawl-meta">Run a crawl above to extract <code>{ title, url }</code> records.</p>
+        </div>
+
+        <div class="toolbar-controls">
+          <div class="search-box">
+            <input
+              type="search"
+              id="search-query-input"
+              placeholder="Filter extracted titles or URLs..."
+              aria-label="Search across extracted records"
+            />
+            <span id="search-count-badge" class="count-badge">0 / 0</span>
+          </div>
+
+          <div class="view-toggle" role="group" aria-label="Output format">
+            <button type="button" id="view-list-btn" class="btn btn-toggle active">Listings View</button>
+            <button type="button" id="view-json-btn" class="btn btn-toggle">OpenSpec JSON</button>
+          </div>
+
+          <div class="export-actions">
+            <button type="button" id="copy-json-btn" class="btn btn-ghost" disabled>Copy JSON</button>
+            <button type="button" id="export-csv-btn" class="btn btn-ghost" disabled>Export CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="listings-view" class="listings-container">
+        <div id="empty-state" class="empty-state">
+          <p>No listings loaded yet. Choose a preset or enter any URL + category and click <strong>Crawl &amp; Extract Listings</strong>.</p>
+        </div>
+        <ol id="listings-grid" class="listings-grid hidden"></ol>
+      </div>
+
+      <div id="json-view" class="json-container hidden">
+        <pre id="json-output-pre"><code id="json-output-code">{
+  "items": []
+}</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
